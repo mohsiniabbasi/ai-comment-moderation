@@ -51,13 +51,15 @@ def match_faq(text: str) -> str | None:
 # ── Suggested human drafts (prefilled in the queue, human approves/edits) ────
 def suggested_reply(category: str, comment: dict) -> str:
     name = (comment.get("author") or "there").split()[0]
-    faq = match_faq(comment.get("text", ""))
-    if faq:
-        return faq
+    # a complaint always gets the empathetic draft — never a canned FAQ blurb,
+    # even if the text happens to mention a price / shipping keyword
     if category == "negative":
         return (f"Hi {name}, I'm really sorry to hear this — that's not the experience we "
                 "want you to have. I've flagged your order to our team; could you drop us a "
                 "DM with your order number so we can put it right today?")
+    faq = match_faq(comment.get("text", ""))
+    if faq:
+        return faq
     return ""
 
 
