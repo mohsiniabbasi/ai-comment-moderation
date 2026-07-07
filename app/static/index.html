@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Comment Moderation Console · Pivot Bureau</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --line:#26303d;
+    --ink:#e6edf3; --muted:#8b98a9; --faint:#5c6b7a;
+    --brand:#6d5efc; --brand2:#8b7bff;
+    --spam:#e0a63b; --abuse:#f0553d; --question:#3d9bf0; --negative:#c264d8; --positive:#3fbf7f;
+    --ok:#3fbf7f; --warn:#e0a63b; --danger:#f0553d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--brand2);text-decoration:none}
+  header{padding:16px 22px;border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:linear-gradient(180deg,#12172099,#0d1117)}
+  .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--brand),#c264d8);
+    display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff}
+  header h1{font-size:16px;margin:0;font-weight:700}
+  header .sub{color:var(--muted);font-size:12px}
+  .spacer{flex:1}
+  .badge{font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid var(--line);
+    color:var(--muted);background:var(--panel)}
+  .badge.live{color:var(--ok);border-color:#1f4a37;background:#0f2018}
+  .disclaimer{font-size:11px;color:var(--faint)}
+
+  .toolbar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+    padding:14px 22px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .kpis{display:flex;gap:10px;flex-wrap:wrap}
+  .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    padding:8px 14px;min-width:92px}
+  .kpi b{display:block;font-size:20px;line-height:1.1}
+  .kpi span{font-size:11px;color:var(--muted)}
+  .slider-wrap{display:flex;align-items:center;gap:10px;min-width:260px}
+  .slider-wrap label{font-size:12px;color:var(--muted);white-space:nowrap}
+  input[type=range]{accent-color:var(--brand);width:150px}
+  .thr{font-variant-numeric:tabular-nums;font-weight:700;min-width:38px;text-align:right}
+  button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--ink);padding:8px 14px;transition:.12s}
+  button:hover{border-color:var(--brand)}
+  button.primary{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+  button.primary:hover{background:var(--brand2)}
+  button.ghost{background:transparent}
+  button:disabled{opacity:.5;cursor:default}
+  button.tiny{padding:5px 10px;font-size:12px}
+
+  main{display:grid;grid-template-columns:1.6fr 1fr;gap:18px;padding:18px 22px;max-width:1400px}
+  @media(max-width:1000px){main{grid-template-columns:1fr}}
+  .col h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);
+    margin:0 0 10px;font-weight:700}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:14px}
+
+  /* ad post */
+  .ad{padding:14px 16px}
+  .ad .row{display:flex;align-items:center;gap:10px}
+  .ad .pg{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,#3fbf7f,#3d9bf0);
+    display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff}
+  .ad .pgname{font-weight:700}
+  .ad .promoted{font-size:11px;color:var(--faint)}
+  .ad h3{margin:12px 0 4px;font-size:15px}
+  .ad p{margin:0;color:var(--muted);font-size:13px}
+
+  /* comment */
+  .comment{padding:13px 16px;border-top:1px solid var(--line);display:flex;gap:11px}
+  .comment:first-child{border-top:none}
+  .comment.hidden{opacity:.5}
+  .av{width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;
+    justify-content:center;font-weight:700;font-size:12px;color:#0d1117;background:var(--muted)}
+  .cbody{flex:1;min-width:0}
+  .cbody .who{font-weight:600;font-size:13px}
+  .cbody .when{color:var(--faint);font-size:11px;margin-left:6px}
+  .cbody .txt{margin:3px 0 8px;word-wrap:break-word}
+  .meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .chip{font-size:11px;padding:2px 9px;border-radius:20px;font-weight:600;border:1px solid transparent}
+  .chip.spam{color:var(--spam);background:#2a220f;border-color:#4a3d1c}
+  .chip.abuse{color:var(--abuse);background:#2a1512;border-color:#4a231c}
+  .chip.question{color:var(--question);background:#0f1f2e;border-color:#1c3a4a}
+  .chip.negative{color:var(--negative);background:#251029;border-color:#41214a}
+  .chip.positive{color:var(--positive);background:#0f2018;border-color:#1f4a37}
+  .conf{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+  .bar{width:70px;height:5px;border-radius:3px;background:var(--panel2);overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:3px}
+  .route{font-size:11px;padding:2px 9px;border-radius:6px;font-weight:600;margin-left:auto}
+  .route.auto_hidden,.route.resolved_hidden,.route.resolved_deleted{color:var(--danger);background:#2a1512}
+  .route.auto_replied,.route.resolved_replied{color:var(--question);background:#0f1f2e}
+  .route.auto_liked{color:var(--positive);background:#0f2018}
+  .route.queued{color:var(--warn);background:#2a220f}
+  .route.resolved_dismissed{color:var(--muted);background:var(--panel2)}
+  .route.Pending{color:var(--faint);background:var(--panel2)}
+  .reason{font-size:11.5px;color:var(--faint);margin-top:6px}
+
+  /* queue */
+  .qitem{padding:13px 16px;border-top:1px solid var(--line)}
+  .qitem:first-child{border-top:none}
+  .qitem .txt{margin:6px 0 8px;font-size:13px}
+  .qitem textarea{width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:8px;font:inherit;font-size:12.5px;resize:vertical;min-height:56px;margin-bottom:8px}
+  .qactions{display:flex;gap:7px;flex-wrap:wrap}
+  .empty{padding:26px 16px;text-align:center;color:var(--faint);font-size:13px}
+
+  /* SOP */
+  .sop{padding:14px 16px}
+  .sop .rule{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+  .sop .rule:first-of-type{border-top:none}
+  .sop .rule .lbl{flex:1;font-size:12.5px}
+  .sop .rule .act{font-size:11px;color:var(--faint)}
+  .switch{position:relative;width:38px;height:21px;flex:none}
+  .switch input{opacity:0;width:0;height:0}
+  .slide{position:absolute;inset:0;background:var(--panel2);border:1px solid var(--line);
+    border-radius:20px;transition:.15s;cursor:pointer}
+  .slide:before{content:"";position:absolute;width:15px;height:15px;left:2px;top:2px;
+    background:var(--muted);border-radius:50%;transition:.15s}
+  .switch input:checked + .slide{background:#1f2a44;border-color:var(--brand)}
+  .switch input:checked + .slide:before{transform:translateX(17px);background:var(--brand2)}
+  .switch.locked .slide{opacity:.55;cursor:not-allowed}
+  .faq{font-size:12px;color:var(--muted);padding-top:8px;border-top:1px solid var(--line);margin-top:6px}
+  .faq b{color:var(--ink)}
+
+  /* audit */
+  .audit{max-height:420px;overflow:auto}
+  .aentry{padding:10px 16px;border-top:1px solid var(--line);font-size:12.5px}
+  .aentry:first-child{border-top:none}
+  .aentry .top{display:flex;align-items:center;gap:8px}
+  .actor{font-size:10px;font-weight:700;padding:1px 7px;border-radius:5px;text-transform:uppercase}
+  .actor.ai{color:var(--brand2);background:#1a1830}
+  .actor.operator{color:var(--positive);background:#0f2018}
+  .aentry .det{color:var(--muted);margin-top:3px}
+  .aentry .gcall{margin-top:6px;font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;
+    background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px;color:#9db4c8;
+    word-break:break-all}
+  .aentry .gcall .m{color:var(--brand2);font-weight:700}
+  .aentry .gcall .sim{color:var(--warn)}
+  .at{color:var(--faint);font-size:10.5px;margin-left:auto}
+  .note{font-size:11.5px;color:var(--faint);padding:0 22px 26px;max-width:1400px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">PB</div>
+  <div>
+    <h1>AI Comment Moderation Console</h1>
+    <div class="sub">Pivot Bureau · live LLM classification → SOP routing → human review</div>
+  </div>
+  <div class="spacer"></div>
+  <span class="badge" id="engineBadge">engine: —</span>
+  <span class="disclaimer">Demo · synthetic data · Meta actions simulated via a Graph-API-shaped adapter</span>
+</header>
+
+<div class="toolbar">
+  <div class="kpis">
+    <div class="kpi"><b id="kTotal">0</b><span>comments</span></div>
+    <div class="kpi"><b id="kAuto">0</b><span>auto-actioned</span></div>
+    <div class="kpi"><b id="kQueue">0</b><span>human queue</span></div>
+    <div class="kpi"><b id="kResolved">0</b><span>resolved</span></div>
+    <div class="kpi"><b id="kActions">0</b><span>actions logged</span></div>
+  </div>
+  <div class="spacer"></div>
+  <div class="slider-wrap">
+    <label>Confidence threshold</label>
+    <input type="range" id="thr" min="0.4" max="0.95" step="0.05" value="0.75" />
+    <span class="thr" id="thrVal">75%</span>
+  </div>
+  <button class="primary" id="runBtn">Run AI moderation</button>
+  <button class="ghost" id="resetBtn">Reset</button>
+</div>
+
+<main>
+  <div class="col">
+    <h2>Ad comment feed</h2>
+    <div class="card ad" id="adCard"></div>
+    <div class="card" id="feed"></div>
+  </div>
+
+  <div class="col">
+    <h2>Human review queue <span id="qCount" style="color:var(--warn)"></span></h2>
+    <div class="card" id="queue"></div>
+
+    <h2>SOP &amp; policy</h2>
+    <div class="card sop" id="sop"></div>
+
+    <h2>Audit log &amp; Graph-API activity</h2>
+    <div class="card audit" id="audit"></div>
+  </div>
+</main>
+
+<div class="note">
+  <b>How this works — stated honestly.</b> Classification is a real, live LLM call
+  (Gemini 2.5 Flash-Lite or Claude Haiku; a transparent rule-based engine runs when no key is set).
+  Every hide / reply / like is expressed as a real Meta Graph API call
+  (correct method, endpoint &amp; params) but <b>simulated</b> here — no Page token or app review
+  needed to run the demo. Drop in a Page access token and the identical calls go live.
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let STATE = null;
+
+const catClass = c => c || "";
+const barColor = c => getComputedStyle(document.documentElement).getPropertyValue('--'+c)||'#888';
+
+async function api(path, body){
+  const opt = {method: body===undefined?'GET':'POST', headers:{'Content-Type':'application/json'}};
+  if(body!==undefined) opt.body = JSON.stringify(body);
+  const r = await fetch(path, opt);
+  return r.json();
+}
+
+function esc(s){return (s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+function timeAgo(iso){const t=esc(iso.slice(11,16));return t;}
+
+function render(){
+  const s = STATE;
+  const eng = s.engine.startsWith('llm') ? s.engine.replace('llm:','live · ') : 'rule-based (no key)';
+  const eb = $('#engineBadge');
+  eb.textContent = 'engine: ' + eng;
+  eb.className = 'badge' + (s.engine.startsWith('llm') ? ' live' : '');
+
+  $('#kTotal').textContent = s.kpi.total;
+  $('#kAuto').textContent = s.kpi.auto;
+  $('#kQueue').textContent = s.kpi.queue;
+  $('#kResolved').textContent = s.kpi.resolved;
+  $('#kActions').textContent = s.kpi.actions;
+
+  // ad
+  $('#adCard').innerHTML = `
+    <div class="row">
+      <div class="pg">${esc(s.brand.page_name.slice(0,2))}</div>
+      <div><div class="pgname">${esc(s.brand.page_name)}</div>
+      <div class="promoted">Sponsored · Page ${esc(s.brand.page_id)}</div></div>
+    </div>
+    <h3>${esc(s.brand.ad_headline)}</h3>
+    <p>${esc(s.brand.ad_copy)}</p>`;
+
+  // feed
+  $('#feed').innerHTML = s.comments.map(c=>{
+    const a = c.analysis, d = c.disposition||{};
+    const st = d.status||'Pending';
+    const isHidden = st==='auto_hidden'||st==='resolved_hidden'||st==='resolved_deleted';
+    const pct = Math.round((a.confidence||0)*100);
+    return `<div class="comment ${isHidden?'hidden':''}">
+      <div class="av">${esc(c.avatar)}</div>
+      <div class="cbody">
+        <div><span class="who">${esc(c.author)}</span><span class="when">${timeAgo(c.received)}</span></div>
+        <div class="txt">${esc(c.text)}</div>
+        <div class="meta">
+          <span class="chip ${catClass(a.category)}">${esc(a.category)}</span>
+          <span class="conf"><span class="bar"><i style="width:${pct}%;background:${barColor(a.category)}"></i></span>${pct}%</span>
+          <span class="route ${st}">${esc(c.status_label)}</span>
+        </div>
+        ${d.reason?`<div class="reason">${esc(d.reason)}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  // queue
+  $('#qCount').textContent = s.queue.length ? '('+s.queue.length+')' : '';
+  if(!s.queue.length){
+    $('#queue').innerHTML = `<div class="empty">${s.processed?'Nothing waiting — every comment was auto-handled or resolved. ✅':'Click “Run AI moderation” to triage the feed.'}</div>`;
+  } else {
+    $('#queue').innerHTML = s.queue.map(c=>{
+      const draft = (c.disposition&&c.disposition.draft)||'';
+      return `<div class="qitem" data-id="${c.id}">
+        <div class="meta">
+          <span class="chip ${catClass(c.analysis.category)}">${esc(c.analysis.category)}</span>
+          <span class="conf">${Math.round(c.analysis.confidence*100)}% confidence</span>
+        </div>
+        <div class="txt">“${esc(c.text)}” <span class="when">— ${esc(c.author)}</span></div>
+        <textarea placeholder="Write a reply…">${esc(draft)}</textarea>
+        <div class="qactions">
+          <button class="primary tiny" data-act="reply">Post reply</button>
+          <button class="tiny" data-act="hide">Hide</button>
+          <button class="tiny" data-act="dismiss">Leave up</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // SOP
+  const r = s.sop.rules;
+  $('#sop').innerHTML = `
+    <div style="font-size:12.5px;color:var(--muted);margin-bottom:6px">
+      Below-threshold or policy-flagged comments go to a human. Toggle whether a category may act automatically.
+    </div>
+    ${Object.entries(r).map(([cat,rule])=>`
+      <div class="rule">
+        <span class="chip ${cat}">${cat}</span>
+        <div class="lbl">${esc(rule.label)}<div class="act">action: ${esc(rule.action)}</div></div>
+        <label class="switch ${cat==='negative'?'locked':''}">
+          <input type="checkbox" data-cat="${cat}" ${rule.auto?'checked':''} ${cat==='negative'?'disabled':''}/>
+          <span class="slide"></span>
+        </label>
+      </div>`).join('')}
+    <div class="faq"><b>FAQ playbook</b> — ${s.faq.length} approved answers power auto-replies to matching questions
+      (shipping, returns, pricing, cruelty-free, results). Unmatched questions escalate to a human.</div>`;
+
+  // audit
+  if(!s.audit.length){
+    $('#audit').innerHTML = `<div class="empty">No actions yet.</div>`;
+  } else {
+    $('#audit').innerHTML = s.audit.map(e=>{
+      let g='';
+      if(e.graph){
+        const p = Object.keys(e.graph.params||{}).length?' '+JSON.stringify(e.graph.params):'';
+        g = `<div class="gcall"><span class="m">${esc(e.graph.method)}</span> ${esc(e.graph.endpoint)}${esc(p)}
+             <span class="sim">· SIMULATED</span></div>`;
+      }
+      return `<div class="aentry">
+        <div class="top"><span class="actor ${e.actor}">${e.actor}</span>
+          <b>${esc(e.action)}</b><span class="at">${esc(e.ts.slice(11))}</span></div>
+        <div class="det">${esc(e.detail)}</div>${g}
+      </div>`;
+    }).join('');
+  }
+}
+
+// interactions
+$('#thr').addEventListener('input', e=>{ $('#thrVal').textContent = Math.round(e.target.value*100)+'%'; });
+$('#thr').addEventListener('change', async e=>{
+  STATE = await api('/api/process', {threshold: parseFloat(e.target.value)});
+  render();
+});
+$('#runBtn').addEventListener('click', async ()=>{
+  const btn=$('#runBtn'); btn.disabled=true; btn.textContent='Classifying…';
+  STATE = await api('/api/process', {threshold: parseFloat($('#thr').value)});
+  btn.disabled=false; btn.textContent='Re-run moderation';
+  render();
+});
+$('#resetBtn').addEventListener('click', async ()=>{
+  STATE = await api('/api/reset', {});
+  $('#thr').value=STATE.sop.threshold; $('#thrVal').textContent=Math.round(STATE.sop.threshold*100)+'%';
+  $('#runBtn').textContent='Run AI moderation';
+  render();
+});
+$('#sop').addEventListener('change', async e=>{
+  if(e.target.dataset.cat){
+    STATE = await api('/api/process', {rules:{[e.target.dataset.cat]:{auto:e.target.checked}}});
+    render();
+  }
+});
+$('#queue').addEventListener('click', async e=>{
+  const btn = e.target.closest('button[data-act]'); if(!btn) return;
+  const item = e.target.closest('.qitem'); const id = item.dataset.id;
+  const act = btn.dataset.act;
+  const body = {action: act};
+  if(act==='reply'){ body.message = item.querySelector('textarea').value.trim();
+    if(!body.message){ item.querySelector('textarea').focus(); return; } }
+  STATE = await api('/api/queue/'+encodeURIComponent(id)+'/resolve', body);
+  render();
+});
+
+// boot
+(async ()=>{ STATE = await api('/api/state');
+  $('#thr').value=STATE.sop.threshold; $('#thrVal').textContent=Math.round(STATE.sop.threshold*100)+'%';
+  render(); })();
+</script>
+</body>
+</html>
