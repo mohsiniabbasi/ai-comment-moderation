@@ -1,0 +1,21 @@
+# Keep the image to what the app needs at runtime (app/ + requirements.txt).
+.git
+.gitignore
+.dockerignore
+.claude/
+
+# Secrets must never be baked into an image.
+.env
+.env.*
+*.env
+
+# Python / OS clutter
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+
+# Docs
+README.md
+DEPLOY.md
